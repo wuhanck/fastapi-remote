@@ -1,0 +1,4 @@
+fastapi[all]
+asyncssh
+uvicorn[standard]
+gunicorn
