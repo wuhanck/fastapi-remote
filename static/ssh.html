@@ -33,11 +33,11 @@
 
   function connectWS() {
     if (!ssh) {
-      term.write('请通过 /ssh/user@host:port@passwd 访问，user、port、passwd可省略\r\n');
+      term.write('请通过 /ssh/user@host:port@passwd 格式访问. 其中user/port/passwd 可选\r\n');
       return;
     }
     const cols = term.cols, rows = term.rows;
-    const ws = new WebSocket(`ws://${location.host}/ws/?ssh=${encodeURIComponent(ssh)}&cols=${cols}&rows=${rows}`);
+    const ws = new WebSocket(`ws://${location.host}/ws-ssh/?ssh=${encodeURIComponent(ssh)}&cols=${cols}&rows=${rows}`);
     ws.binaryType = "arraybuffer";
     ws.onopen = () => { term.focus(); };
     ws.onclose = () => term.write('\r\n[WebSocket closed]\r\n');
