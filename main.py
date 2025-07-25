@@ -9,7 +9,8 @@ import sys
 import traceback
 import re
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
+from fastapi.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -55,7 +56,7 @@ def parse_x_path(x_path, d_user, d_pass, d_port):
     '''
     m = re.match(r'^(?:(?P<user>[^@/]+)@)?(?P<host>[^@:]+)(?::(?P<port>\d+))?(?:@(?P<passwd>[^@]+))?$', x_path)
     if not m:
-        raise ValueError('parse-ssh-path [user@]host[:port][@passwd]')
+        raise ValueError('parse-x-path [user@]host[:port][@passwd]')
     user = m.group('user') or d_user
     host = m.group('host')
     port = int(m.group('port') or d_port)
@@ -119,12 +120,40 @@ async def ws_ssh(websocket: WebSocket):
     except Exception as e:
         logging.info(f'ws-ssh\n{fmt_e(e)}')
 
+    if websocket.client_state != WebSocketState.DISCONNECTED:
+        await websocket.close()
     logging.debug('ws-ssh end')
 
 
 @app.get('/vnc/{vnc_path:path}')
 async def vnc_page(vnc_path: str):
     return FileResponse('static/vnc.html')
+
+
+async def vnc_relay(websocket, user, host, port, passwd):
+    tcp_reader, tcp_writer = await asyncio.open_connection(host, port)
+
+    async def ws_to_tcp():
+        while True:
+            data = await websocket.receive_bytes()
+            tcp_writer.write(data)
+            await tcp_writer.drain()
+
+    async def tcp_to_ws():
+        while True:
+            data = await tcp_reader.read(4096)
+            if data == b'':
+                await asyncio.sleep(15)  # wait for client to gracefully end session
+                raise UserWarning('vnc-relay can close')
+            await websocket.send_bytes(data)
+
+    try:
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(ws_to_tcp())
+            tg.create_task(tcp_to_ws())
+    finally:
+            tcp_writer.close()
+            await tcp_writer.wait_closed()
 
 
 @app.websocket('/ws-vnc/')
@@ -138,13 +167,17 @@ async def ws_vnc(websocket: WebSocket):
             raise UserWarning('ws-vnc missing vnc path')
 
         user, host, port, passwd = parse_x_path(vnc_path, DEFAULT_VNC_USER, DEFAULT_VNC_PASS, 5900)
+        await vnc_relay(websocket, user, host, port, passwd)
     except Exception as e:
         logging.info(f'ws-vnc\n{fmt_e(e)}')
 
+    if websocket.client_state != WebSocketState.DISCONNECTED:
+        await websocket.close()
     logging.debug('ws-vnc end')
 
 
 if __name__ == '__main__':
     import uvicorn
     logger.info(f'Attempting to start Uvicorn from __main__...')
-    uvicorn.run('main:app', host='0.0.0.0', port=8080, reload=True, log_level='debug')
+    #uvicorn.run('main:app', host='0.0.0.0', port=8080, reload=True, log_level='debug')
+    uvicorn.run('main:app', host='0.0.0.0', port=8080, reload=True, log_level='info')
