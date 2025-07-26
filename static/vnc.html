@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>noVNC (Fixed Zoom Control)</title>
+    <title>noVNC (Top-Aligned with Scroll)</title>
 
     <style>
         body { 
@@ -51,38 +51,66 @@
             padding: 2px;
             height: 24px;
         }
+        
+        /* 修复1: #screen 设置为垂直顶部对齐，水平居中 */
         #screen { 
             flex: 1; 
-            overflow: auto; 
+            overflow: hidden; /* 重要：防止双层滚动条 */
             display: flex;
-            align-items: center;
-            justify-content: center;
+            align-items: flex-start; /* 顶部对齐（原来是center） */
+            justify-content: center; /* 保持水平居中 */
         }
         
-        /* 确保缩放后内容自动居中 */
+        /* 修复2: 容器设置为自动高度，允许滚动 */
         #screen > div {
             position: relative;
             width: 100% !important;
-            height: 100% !important;
-            overflow: hidden !important;
+            height: auto !important; /* 自动高度（原来是100%） */
+            min-height: 100% !important; /* 至少占满屏幕高度 */
+            overflow: auto !important; /* 显示滚动条（原来是hidden） */
             display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column; /* 重要：确保垂直布局 */
+            align-items: center; /* 水平居中 */
+            background-color: black;
         }
-
-        #screen > div > canvas {
+        
+        /* 修复3: 确保canvas容器正确应用样式 */
+        #screen > div > div {
+            position: relative;
+            display: inline-block;
             width: auto !important;
             height: auto !important;
-            transform-origin: center center !important;
+            margin: 0 auto;
+        }
+
+        /* 修复4: 设置缩放原点为顶部居中 */
+        #screen > div > div > canvas {
+            width: auto !important;
+            height: auto !important;
+            transform-origin: center top !important; /* 顶部为缩放原点（原来是center center） */
             image-rendering: -moz-crisp-edges !important;
             image-rendering: pixelated !important;
             max-width: 100% !important;
-            max-height: 100% !important;
+            /* 移除了 max-height: 100% !important，允许内容超出 */
         }
         
-        /* 添加平滑过渡效果 */
-        #screen > div > canvas {
-            transition: transform 0.1s ease;
+        /* 添加美观的滚动条样式 */
+        #screen > div::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+        
+        #screen > div::-webkit-scrollbar-track {
+            background: #444;
+        }
+        
+        #screen > div::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 6px;
+        }
+        
+        #screen > div::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
         }
     </style>
 </head>
@@ -122,7 +150,6 @@
 
         function connectedToServer(e) {
             status("Connected");
-            // 只在连接时应用一次缩放
             setTimeout(applyManualZoom, 300);
         }
         
@@ -181,7 +208,7 @@
             applyManualZoom();
         };
 
-        // 仅通过选择器控制缩放
+        // 修复版缩放函数 - 确保顶部居中和滚动条正常工作
         function applyManualZoom() {
             if (!rfb) { 
                 return; 
@@ -193,15 +220,20 @@
             const screen = document.getElementById('screen');
             if (screen.firstChild && screen.firstChild.firstChild) {
                 const container = screen.firstChild;
-                const canvas = screen.firstChild.firstChild;
+                const innerContainer = screen.firstChild.firstChild;
+                const canvas = innerContainer.firstChild;
                 
-                // 设置缩放原点为中心
-                canvas.style.transformOrigin = 'center center';
-                canvas.style.transform = `scale(${zoomLevel})`;
+                // 修复1: 设置缩放原点为顶部居中
+                innerContainer.style.transformOrigin = 'center top';
+                innerContainer.style.transform = `scale(${zoomLevel})`;
                 
-                // 确保容器尺寸正确
+                // 修复2: 确保容器尺寸正确
                 container.style.width = '100%';
-                container.style.height = '100%';
+                container.style.minHeight = '100%';
+                innerContainer.style.display = 'inline-block';
+                innerContainer.style.width = 'auto';
+                innerContainer.style.height = 'auto';
+                innerContainer.style.margin = '0 auto';
                 
                 // 强制重绘
                 setTimeout(() => {
@@ -217,14 +249,11 @@
             status("Connected");
         }
 
-        // 仅绑定缩放选择器事件 - 这是唯一的缩放控制入口
+        // 仅绑定缩放选择器事件
         const zoomSelector = document.getElementById('zoomSelector');
         zoomSelector.addEventListener('change', applyManualZoom);
         
-        // 重要：完全移除了窗口resize事件处理
-        // 现在窗口大小变化时不会触发任何缩放调整
-        
-        // 仅在DOM加载完成后尝试应用缩放（不处理resize）
+        // 仅在DOM加载完成后尝试应用缩放
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(applyManualZoom, 100);
         });
