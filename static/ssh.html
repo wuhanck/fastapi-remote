@@ -1,64 +1,65 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>WebSSH</title>
-  <link rel="stylesheet" href="/node_modules/@xterm/xterm/css/xterm.css" />
-  <style>body { margin: 0; }</style>
+    <title>WebSSH</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/node_modules/@xterm/xterm/css/xterm.css" />
+    <style>body { margin: 0; }</style>
 </head>
 <body>
-<div id="terminal" style="width:100vw;height:100vh;"></div>
-<script src="/node_modules/@xterm/xterm/lib/xterm.js"></script>
-<script src="/node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
-<script src="/node_modules/@xterm/addon-attach/lib/addon-attach.js"></script>
-<script>
-  function parseSSHFromPath() {
-    const match = window.location.pathname.match(/^\/ssh\/(.+)$/);
-    return match ? match[1] : null;
-  }
+    <div id="terminal" style="width:100vw;height:100vh;"></div>
+    <script src="/node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="/node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+    <script src="/node_modules/@xterm/addon-attach/lib/addon-attach.js"></script>
+    <script>
+        function parseSSHFromPath() {
+            const match = window.location.pathname.match(/^\/ssh\/(.+)$/);
+            return match ? match[1] : null;
+        }
 
-  const ssh = parseSSHFromPath();
-  const term = new window.Terminal({
-    fontFamily: 'monospace',
-    fontSize: 16,
-    cursorBlink: true,
-    scrollback: 1000,
-    theme: { background: '#1e1e1e' }
-  });
-  const fitAddon = new window.FitAddon.FitAddon();
-  term.loadAddon(fitAddon);
-  term.open(document.getElementById('terminal'));
-  fitAddon.fit();
-  term.focus();
+        const ssh = parseSSHFromPath();
+        const term = new window.Terminal({
+            fontFamily: 'monospace',
+            fontSize: 16,
+            cursorBlink: true,
+            scrollback: 1000,
+            theme: { background: '#1e1e1e' }
+        });
+        const fitAddon = new window.FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+        term.focus();
 
-  function connectWS() {
-    if (!ssh) {
-      term.write('请通过 /ssh/user@host:port@passwd 格式访问. 其中user/port/passwd 可选\r\n');
-      return;
-    }
-    const cols = term.cols, rows = term.rows;
-    const ws = new WebSocket(`ws://${location.host}/ws-ssh/?ssh=${encodeURIComponent(ssh)}&cols=${cols}&rows=${rows}`);
-    ws.binaryType = "arraybuffer";
-    ws.onopen = () => { term.focus(); };
-    ws.onclose = () => term.write('\r\n[WebSocket closed]\r\n');
+        function connectWS() {
+            if (!ssh) {
+                term.write('请通过 /ssh/user@host:port@passwd 格式访问. 其中user/port/passwd 可选\r\n');
+                return;
+            }
+            const cols = term.cols, rows = term.rows;
+            const ws = new WebSocket(`ws://${location.host}/ws-ssh/?ssh=${encodeURIComponent(ssh)}&cols=${cols}&rows=${rows}`);
+            ws.binaryType = "arraybuffer";
+            ws.onopen = () => { term.focus(); };
+            ws.onclose = () => term.write('\r\n[WebSocket closed]\r\n');
 
-    // attachAddon自动绑定输入输出
-    const attachAddon = new window.AttachAddon.AttachAddon(ws);
-    term.loadAddon(attachAddon);
+            // attachAddon自动绑定输入输出
+            const attachAddon = new window.AttachAddon.AttachAddon(ws);
+            term.loadAddon(attachAddon);
 
-    // 终端resize时通知后端
-    term.onResize(({cols, rows}) => {
-      const resizeMsg = JSON.stringify({resize: {cols, rows}});
-      const binaryMsg = new TextEncoder().encode(resizeMsg);
-      ws.send(binaryMsg);
-    });
-  }
+            // 终端resize时通知后端
+            term.onResize(({cols, rows}) => {
+                const resizeMsg = JSON.stringify({resize: {cols, rows}});
+                const binaryMsg = new TextEncoder().encode(resizeMsg);
+                ws.send(binaryMsg);
+            });
+        }
 
-  connectWS();
-  window.addEventListener('resize', () => {
-    fitAddon.fit();
-    term.focus();
-  });
-</script>
+        connectWS();
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+            term.focus();
+        });
+    </script>
 </body>
 </html>
