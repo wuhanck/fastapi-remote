@@ -27,8 +27,8 @@ app.mount('/static', StaticFiles(directory='static'), name='static')
 
 DEFAULT_SSH_USER = os.environ.get('WS_SSH_USER', 'cc')
 DEFAULT_SSH_PASS = os.environ.get('WS_SSH_PASS', 'cc')
-DEFAULT_VNC_USER = os.environ.get('WS_SSH_USER', 'cc')
-DEFAULT_VNC_PASS = os.environ.get('WS_SSH_PASS', 'cc')
+DEFAULT_VNC_USER = ''
+DEFAULT_VNC_PASS = ''
 
 
 def fmt_e(exc: Exception, indent: int=0) -> str:
